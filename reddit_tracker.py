@@ -123,7 +123,7 @@ def activity_chart():
     plt.figure(figsize=(10, 5))
     for subreddit in df["subreddit"].unique():
         sub_df = df[df["subreddit"] == subreddit]
-        plt.plot(sub_df["timestamp"], sub_df["active_percentage"], label=subreddit)
+        plt.scatter(sub_df["timestamp"], sub_df["active_percentage"], label=subreddit)
     
     plt.xlabel("Tid")
     plt.ylabel("% Aktiva Användare")
@@ -135,6 +135,20 @@ def activity_chart():
     plt.close()
     
     return send_file("activity_chart.png", mimetype="image/png")
+
+# === API-endpoint för att visa övervakade subreddits ===
+@server.route("/api/subreddits", methods=["GET"])
+def api_subreddits():
+    return jsonify({"subreddits": SUBREDDITS})
+
+# === API-endpoint för att visa status på Reddit API ===
+@server.route("/api/status", methods=["GET"])
+def api_status():
+    token = get_reddit_token()
+    if token:
+        return jsonify({"status": "online"})
+    else:
+        return jsonify({"status": "offline"})
 
 # === API-endpoint för att verifiera databasinnehåll ===
 @server.route("/api/check_db", methods=["GET"])
