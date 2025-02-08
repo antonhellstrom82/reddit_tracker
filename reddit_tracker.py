@@ -11,8 +11,8 @@ SUBREDDITS = ["Normalnudes", "gonewild30plus", "Tributeme", "nude_selfie"]
 DB_NAME = "reddit_activity.db"
 
 # Reddit API Credentials
-CLIENT_ID = os.getenv("gYWqyO-yZxUH_TKbftoJug")
-CLIENT_SECRET = os.getenv("rqMVZxkpAyxqSBBsrcJpxmc3SJjozA")
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 USER_AGENT = "Mozilla/5.0 (compatible; RedditTrackerBot/1.0; +https://reddit-tracker-jzk5.onrender.com)"
 
 # === Skapa och initiera databasen ===
