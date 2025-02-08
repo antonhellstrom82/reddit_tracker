@@ -13,6 +13,8 @@ DB_NAME = "reddit_activity.db"
 # Reddit API Credentials
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
+USERNAME = os.getenv("REDDIT_USERNAME")
+PASSWORD = os.getenv("REDDIT_PASSWORD")
 USER_AGENT = "Mozilla/5.0 (compatible; RedditTrackerBot/1.0; +https://reddit-tracker-jzk5.onrender.com)"
 
 # === Skapa och initiera databasen ===
@@ -37,16 +39,40 @@ initialize_database()
 # === Skapa Flask-server ===
 server = Flask(__name__)
 
+# === Funktion för att autentisera mot Reddit API ===
+def get_reddit_token():
+    auth = requests.auth.HTTPBasicAuth(CLIENT_ID, CLIENT_SECRET)
+    data = {
+        'grant_type': 'password',
+        'username': USERNAME,
+        'password': PASSWORD
+    }
+    headers = {'User-Agent': USER_AGENT}
+    response = requests.post("https://www.reddit.com/api/v1/access_token", auth=auth, data=data, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json().get("access_token")
+    else:
+        print(f"Failed to get token: {response.status_code}, {response.text}")
+        return None
+
 # === Funktion för att hämta aktiva användare från Reddit ===
 def fetch_active_users(subreddit):
-    url = f"https://www.reddit.com/r/{subreddit}/about.json"
-    headers = {"User-Agent": USER_AGENT}
+    token = get_reddit_token()
+    if not token:
+        return {"error": "Failed to authenticate with Reddit API"}
+    
+    url = f"https://oauth.reddit.com/r/{subreddit}/about.json"
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Authorization": f"Bearer {token}"
+    }
     response = requests.get(url, headers=headers)
     
     if response.status_code == 200:
         data = response.json()
         active_users = data["data"].get("active_user_count", 0)
-        subscribers = data["data"].get("subscribers", 0)  # Hämta antal medlemmar
+        subscribers = data["data"].get("subscribers", 0)
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
