@@ -46,23 +46,25 @@ def fetch_active_users(subreddit):
     if response.status_code == 200:
         data = response.json()
         active_users = data["data"].get("active_user_count", 0)
+        subscribers = data["data"].get("subscribers", 0)  # Hämta antal medlemmar
         
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute("INSERT INTO active_users (subreddit, active_users) VALUES (?, ?)", (subreddit, active_users))
         conn.commit()
         conn.close()
-        return active_users
+        
+        return {"active_users": active_users, "subscribers": subscribers}
     else:
-        return None
+        return {"error": f"Failed to fetch data. Status code: {response.status_code}"}
 
-# === API-endpoint för att hämta aktiva användare ===
+# === API-endpoint för att hämta aktiva användare och medlemmar ===
 @server.route("/api/fetch_users", methods=["GET"])
 def api_fetch_users():
     results = {}
     for subreddit in SUBREDDITS:
-        active_users = fetch_active_users(subreddit)
-        results[subreddit] = active_users if active_users is not None else "Error"
+        data = fetch_active_users(subreddit)
+        results[subreddit] = data
     return jsonify(results)
 
 # === API-endpoint för att verifiera databasinnehåll ===
