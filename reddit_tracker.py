@@ -117,16 +117,16 @@ def api_fetch_users():
 @server.route("/api/activity_chart", methods=["GET"])
 def activity_chart():
     conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT timestamp, subreddit, active_percentage FROM active_users", conn)
+    df = pd.read_sql_query("SELECT timestamp, subreddit, active_users FROM active_users", conn)
     conn.close()
     
     plt.figure(figsize=(10, 5))
     for subreddit in df["subreddit"].unique():
         sub_df = df[df["subreddit"] == subreddit]
-        plt.scatter(sub_df["timestamp"], sub_df["active_percentage"], label=subreddit)
+        plt.scatter(sub_df["timestamp"], sub_df["active_users"], label=subreddit)
     
     plt.xlabel("Tid")
-    plt.ylabel("% Aktiva Användare")
+    plt.ylabel("Antal Aktiva Användare")
     plt.title("Utveckling av aktiva användare i subreddits")
     plt.legend()
     plt.xticks(rotation=45)
@@ -136,29 +136,19 @@ def activity_chart():
     
     return send_file("activity_chart.png", mimetype="image/png")
 
-# === API-endpoint för att visa övervakade subreddits ===
-@server.route("/api/subreddits", methods=["GET"])
-def api_subreddits():
-    return jsonify({"subreddits": SUBREDDITS})
-
-# === API-endpoint för att visa status på Reddit API ===
+# === API-endpoint för att visa status på API:er ===
 @server.route("/api/status", methods=["GET"])
 def api_status():
     token = get_reddit_token()
-    if token:
-        return jsonify({"status": "online"})
-    else:
-        return jsonify({"status": "offline"})
-
-# === API-endpoint för att verifiera databasinnehåll ===
-@server.route("/api/check_db", methods=["GET"])
-def check_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM active_users")
     count = cursor.fetchone()[0]
     conn.close()
-    return jsonify({"record_count": count})
+    return jsonify({
+        "reddit_api": "online" if token else "offline",
+        "data_points": {sub: count for sub in SUBREDDITS}
+    })
 
 if __name__ == "__main__":
     server.run(debug=True, host="0.0.0.0", port=5000)
