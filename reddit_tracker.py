@@ -13,7 +13,7 @@ DB_NAME = "reddit_activity.db"
 # Reddit API Credentials
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-USER_AGENT = "RedditTracker/0.1 by YourUsername"
+USER_AGENT = "Mozilla/5.0 (compatible; RedditTrackerBot/1.0; +https://reddit-tracker-jzk5.onrender.com)"
 
 # === Skapa och initiera databasen ===
 def initialize_database():
