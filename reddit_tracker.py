@@ -21,6 +21,9 @@ USERNAME = os.getenv("REDDIT_USERNAME")
 PASSWORD = os.getenv("REDDIT_PASSWORD")
 USER_AGENT = "RedditTracker/1.0"
 
+# Lista över subreddits att tracka
+SUBREDDITS = ["Normalnudes", "Gonewild", "RealGirls", "Tributeme"]
+
 # Funktion för att hämta OAuth-token
 def get_oauth_token():
     auth = requests.auth.HTTPBasicAuth(CLIENT_ID, CLIENT_SECRET)
@@ -55,10 +58,7 @@ def fetch_and_store_reddit_data():
     cursor = conn.cursor()
     
     while True:
-        cursor.execute("SELECT DISTINCT subreddit FROM activity")
-        subreddits = [row[0] for row in cursor.fetchall()]
-        
-        for subreddit in subreddits:
+        for subreddit in SUBREDDITS:
             response = requests.get(API_URL.format(subreddit), headers=headers)
             if response.status_code == 200:
                 data = response.json()
@@ -82,17 +82,16 @@ def get_data(subreddit):
 
 @app.route("/")
 def index():
-    conn = sqlite3.connect("reddit_activity.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT subreddit FROM activity")
-    subreddits = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return render_template("index.html", subreddits=subreddits)
+    return render_template("index.html", subreddits=SUBREDDITS)
 
 @app.route("/api/activity_chart")
 def activity_chart():
     subreddit = request.args.get("subreddit", "Normalnudes")
     df = get_data(subreddit)
+    
+    if df.empty:
+        return jsonify({"error": "No data available"}), 404
+
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values(by='timestamp')
     
@@ -117,17 +116,12 @@ def activity_chart():
 def get_timestamps():
     subreddit = request.args.get("subreddit", "Normalnudes")
     df = get_data(subreddit)
+    
+    if df.empty:
+        return jsonify({"error": "No data available"}), 404
+    
     timestamps = df['timestamp'].tolist()
     return jsonify(timestamps)
-
-@app.route("/activity")
-def activity():
-    conn = sqlite3.connect("reddit_activity.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT subreddit FROM activity")
-    subreddits = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return render_template("activity.html", subreddits=subreddits)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
