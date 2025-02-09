@@ -9,6 +9,7 @@ import os
 import requests
 import time
 import threading
+import sys
 
 app = Flask(__name__, template_folder="templates")
 
@@ -70,6 +71,11 @@ def scheduled_fetch():
     while True:
         fetch_and_store_reddit_data()
         time.sleep(300)  # Vänta 5 minuter
+
+# Kontrollera om skriptet körs som cron-jobb
+if "--fetch" in sys.argv:
+    fetch_and_store_reddit_data()
+    sys.exit()
 
 thread = threading.Thread(target=scheduled_fetch, daemon=True)
 thread.start()
