@@ -9,6 +9,23 @@ import os
 
 app = Flask(__name__)
 
+def create_table():
+    conn = sqlite3.connect("reddit_activity.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subreddit TEXT NOT NULL,
+            active_users INTEGER NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Kör denna funktion vid uppstart av backend
+create_table()
+
 def get_data():
     conn = sqlite3.connect("reddit_activity.db")
     df = pd.read_sql_query("SELECT * FROM activity", conn)
