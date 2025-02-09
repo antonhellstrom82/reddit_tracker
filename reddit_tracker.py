@@ -56,20 +56,22 @@ def fetch_and_store_reddit_data():
     conn = sqlite3.connect("reddit_activity.db", check_same_thread=False)
     cursor = conn.cursor()
     
-    while True:
-        for subreddit in SUBREDDITS:
-            response = requests.get(API_URL.format(subreddit), headers=headers)
-            if response.status_code == 200:
-                data = response.json()
-                active_users = data["data"].get("active_user_count", 0)
-                cursor.execute("INSERT INTO activity (subreddit, active_users) VALUES (?, ?)", (subreddit, active_users))
-                conn.commit()
-        
-        time.sleep(300)  # Vänta 5 minuter innan nästa hämtning
+    for subreddit in SUBREDDITS:
+        response = requests.get(API_URL.format(subreddit), headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            active_users = data["data"].get("active_user_count", 0)
+            cursor.execute("INSERT INTO activity (subreddit, active_users) VALUES (?, ?)", (subreddit, active_users))
+            conn.commit()
     conn.close()
 
 # Starta tråd för att hämta data kontinuerligt
-thread = threading.Thread(target=fetch_and_store_reddit_data, daemon=True)
+def scheduled_fetch():
+    while True:
+        fetch_and_store_reddit_data()
+        time.sleep(300)  # Vänta 5 minuter
+
+thread = threading.Thread(target=scheduled_fetch, daemon=True)
 thread.start()
 
 # Hämta data från databasen
@@ -113,6 +115,11 @@ def get_timestamps():
     df = get_data(subreddit)
     timestamps = df['timestamp'].tolist()
     return jsonify(timestamps)
+
+@app.route("/api/fetch_data", methods=["POST"])
+def fetch_data():
+    fetch_and_store_reddit_data()
+    return jsonify({"status": "Data hämtad"})
 
 @app.route("/activity")
 def activity():
