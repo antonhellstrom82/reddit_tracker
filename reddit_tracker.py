@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from flask import Flask, jsonify, send_file, request
+from flask import Flask, jsonify, send_file, request, render_template
 import io
 import sqlite3
 import os
@@ -10,7 +10,7 @@ import requests
 import time
 import threading
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates")
 
 # Reddit API-konfiguration
 API_URL = "https://oauth.reddit.com/r/{}/about.json"
@@ -51,7 +51,7 @@ create_table()
 def fetch_and_store_reddit_data():
     token = get_oauth_token()
     headers = {"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT}
-    conn = sqlite3.connect("reddit_activity.db")
+    conn = sqlite3.connect("reddit_activity.db", check_same_thread=False)
     cursor = conn.cursor()
     
     while True:
@@ -80,9 +80,14 @@ def get_data(subreddit):
     conn.close()
     return df
 
-# Släta ut data
-def smooth_data(data, window=5):
-    return data.rolling(window=window, min_periods=1).mean()
+@app.route("/")
+def index():
+    conn = sqlite3.connect("reddit_activity.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT subreddit FROM activity")
+    subreddits = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return render_template("index.html", subreddits=subreddits)
 
 @app.route("/api/activity_chart")
 def activity_chart():
@@ -92,8 +97,7 @@ def activity_chart():
     df = df.sort_values(by='timestamp')
     
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(df['timestamp'], smooth_data(df['active_users'], window=5), color='blue', linewidth=2, label=subreddit)
-    ax.scatter(df['timestamp'], df['active_users'], color='red', alpha=0.5, s=30)
+    ax.plot(df['timestamp'], df['active_users'], marker='o', linestyle='-', color='blue', label=subreddit)
     
     ax.set_title(f"Utveckling av aktiva användare i {subreddit}")
     ax.set_xlabel("Tid")
@@ -109,6 +113,13 @@ def activity_chart():
     img.seek(0)
     
     return send_file(img, mimetype='image/png')
+
+@app.route("/api/timestamps")
+def get_timestamps():
+    subreddit = request.args.get("subreddit", "Normalnudes")
+    df = get_data(subreddit)
+    timestamps = df['timestamp'].tolist()
+    return jsonify(timestamps)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
