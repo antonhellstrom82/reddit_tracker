@@ -1,154 +1,58 @@
-import requests
-import sqlite3
-import pandas as pd
-import os
-import time
-import threading
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 from datetime import datetime
 from flask import Flask, jsonify, send_file
+import io
+import sqlite3
 
-# === Konfiguration ===
-SUBREDDITS = ["Normalnudes", "gonewild30plus", "Tributeme", "nude_selfie"]
-DB_NAME = "reddit_activity.db"
+app = Flask(__name__)
 
-# Reddit API Credentials
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-USERNAME = os.getenv("REDDIT_USERNAME")
-PASSWORD = os.getenv("REDDIT_PASSWORD")
-USER_AGENT = "Mozilla/5.0 (compatible; RedditTrackerBot/1.0; +https://reddit-tracker-jzk5.onrender.com)"
-
-# === Skapa och initiera databasen ===
-def initialize_database():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS active_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            subreddit TEXT NOT NULL,
-            active_users INTEGER NOT NULL,
-            subscribers INTEGER NOT NULL,
-            active_percentage REAL NOT NULL
-        )
-    """)
-    
-    conn.commit()
+def get_data():
+    conn = sqlite3.connect("reddit_activity.db")
+    df = pd.read_sql_query("SELECT * FROM activity", conn)
     conn.close()
+    return df
 
-initialize_database()
+def smooth_data(data, window=5):
+    return data.rolling(window=window, min_periods=1).mean()
 
-# === Skapa Flask-server ===
-server = Flask(__name__)
-
-# === Funktion för att autentisera mot Reddit API ===
-def get_reddit_token():
-    auth = requests.auth.HTTPBasicAuth(CLIENT_ID, CLIENT_SECRET)
-    data = {
-        'grant_type': 'password',
-        'username': USERNAME,
-        'password': PASSWORD
-    }
-    headers = {'User-Agent': USER_AGENT}
-    response = requests.post("https://www.reddit.com/api/v1/access_token", auth=auth, data=data, headers=headers)
-    
-    if response.status_code == 200:
-        return response.json().get("access_token")
-    else:
-        print(f"Failed to get token: {response.status_code}, {response.text}")
-        return None
-
-# === Funktion för att hämta och logga aktiva användare ===
-def fetch_active_users(subreddit):
-    token = get_reddit_token()
-    if not token:
-        return {"error": "Failed to authenticate with Reddit API"}
-    
-    url = f"https://oauth.reddit.com/r/{subreddit}/about.json"
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Authorization": f"Bearer {token}"
-    }
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        active_users = data["data"].get("active_user_count", 0)
-        subscribers = data["data"].get("subscribers", 0)
-        active_percentage = (active_users / subscribers) * 100 if subscribers > 0 else 0
-        
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO active_users (subreddit, active_users, subscribers, active_percentage) 
-            VALUES (?, ?, ?, ?)
-        """, (subreddit, active_users, subscribers, active_percentage))
-        conn.commit()
-        conn.close()
-        
-        return {"active_users": active_users, "subscribers": subscribers, "active_percentage": active_percentage}
-    else:
-        return {"error": f"Failed to fetch data. Status code: {response.status_code}"}
-
-# === Automatisk loggning var 15:e minut ===
-def log_active_users():
-    while True:
-        for subreddit in SUBREDDITS:
-            fetch_active_users(subreddit)
-        print(f"[LOG] Data loggad vid {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        time.sleep(900)  # Vänta i 15 minuter
-
-# Starta loggning i en separat tråd
-t = threading.Thread(target=log_active_users, daemon=True)
-t.start()
-
-# === API-endpoint för att hämta aktiva användare ===
-@server.route("/api/fetch_users", methods=["GET"])
-def api_fetch_users():
-    results = {}
-    for subreddit in SUBREDDITS:
-        data = fetch_active_users(subreddit)
-        results[subreddit] = data
-    return jsonify(results)
-
-# === API-endpoint för att hämta och visualisera datan ===
-@server.route("/api/activity_chart", methods=["GET"])
+@app.route("/api/activity_chart")
 def activity_chart():
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query("SELECT timestamp, subreddit, active_users FROM active_users", conn)
-    conn.close()
+    df = get_data()
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
     
-    plt.figure(figsize=(10, 5))
-    for subreddit in df["subreddit"].unique():
-        sub_df = df[df["subreddit"] == subreddit]
-        plt.scatter(sub_df["timestamp"], sub_df["active_users"], label=subreddit)
+    fig, ax = plt.subplots(figsize=(10, 5))
     
-    plt.xlabel("Tid")
-    plt.ylabel("Antal Aktiva Användare")
-    plt.title("Utveckling av aktiva användare i subreddits")
-    plt.legend()
-    plt.xticks(rotation=45)
+    colors = ['blue', 'orange', 'green', 'red']
+    
+    for i, subreddit in enumerate(df['subreddit'].unique()):
+        sub_df = df[df['subreddit'] == subreddit]
+        
+        # Sort by timestamp
+        sub_df = sub_df.sort_values(by='timestamp')
+        
+        # Scatter plot for raw data
+        ax.scatter(sub_df['timestamp'], sub_df['active_users'], color=colors[i], alpha=0.5, label=subreddit, s=20)
+        
+        # Trend line
+        smoothed = smooth_data(sub_df['active_users'], window=5)
+        ax.plot(sub_df['timestamp'], smoothed, color=colors[i], linewidth=2)
+    
+    ax.set_title("Utveckling av aktiva användare i subreddits")
+    ax.set_xlabel("Tid")
+    ax.set_ylabel("Antal Aktiva Användare")
+    ax.legend()
+    
+    # Roterar x-axelns etiketter
+    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.savefig("activity_chart.png")
-    plt.close()
     
-    return send_file("activity_chart.png", mimetype="image/png")
-
-# === API-endpoint för att visa status på API:er ===
-@server.route("/api/status", methods=["GET"])
-def api_status():
-    token = get_reddit_token()
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM active_users")
-    count = cursor.fetchone()[0]
-    conn.close()
-    return jsonify({
-        "reddit_api": "online" if token else "offline",
-        "data_points": {sub: count for sub in SUBREDDITS}
-    })
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    
+    return send_file(img, mimetype='image/png')
 
 if __name__ == "__main__":
-    server.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True)
