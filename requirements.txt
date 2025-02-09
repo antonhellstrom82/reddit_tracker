@@ -1,4 +1,6 @@
-flask
+Flask
 requests
 pandas
 matplotlib
+numpy
+sqlite3
