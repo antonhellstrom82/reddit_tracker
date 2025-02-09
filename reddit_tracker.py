@@ -23,7 +23,7 @@ def activity_chart():
     df = get_data()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     
-    fig, ax = plt.subplots(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(12, 6))
     
     colors = ['blue', 'orange', 'green', 'red']
     
@@ -34,7 +34,7 @@ def activity_chart():
         sub_df = sub_df.sort_values(by='timestamp')
         
         # Scatter plot for raw data
-        ax.scatter(sub_df['timestamp'], sub_df['active_users'], color=colors[i], alpha=0.5, label=subreddit, s=20)
+        ax.scatter(sub_df['timestamp'], sub_df['active_users'], color=colors[i], alpha=0.5, label=subreddit, s=30)
         
         # Trend line
         smoothed = smooth_data(sub_df['active_users'], window=5)
@@ -45,8 +45,10 @@ def activity_chart():
     ax.set_ylabel("Antal Aktiva Användare")
     ax.legend()
     
-    # Roterar x-axelns etiketter
+    # Anpassar x-axeln för att förhindra överlappning
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))  # Max 10 etiketter på x-axeln
     plt.xticks(rotation=45, ha='right')
+    plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     
     img = io.BytesIO()
