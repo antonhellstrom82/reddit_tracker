@@ -98,7 +98,6 @@ def activity_chart():
     
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(df['timestamp'], df['active_users'], marker='o', linestyle='-', color='blue', label=subreddit)
-    
     ax.set_title(f"Utveckling av aktiva användare i {subreddit}")
     ax.set_xlabel("Tid")
     ax.set_ylabel("Antal Aktiva Användare")
@@ -120,6 +119,15 @@ def get_timestamps():
     df = get_data(subreddit)
     timestamps = df['timestamp'].tolist()
     return jsonify(timestamps)
+
+@app.route("/activity")
+def activity():
+    conn = sqlite3.connect("reddit_activity.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT subreddit FROM activity")
+    subreddits = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return render_template("activity.html", subreddits=subreddits)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
