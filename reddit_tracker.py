@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import Flask, jsonify, send_file
 import io
 import sqlite3
+import os
 
 app = Flask(__name__)
 
@@ -55,4 +56,5 @@ def activity_chart():
     return send_file(img, mimetype='image/png')
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
