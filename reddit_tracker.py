@@ -21,7 +21,6 @@ USERNAME = os.getenv("REDDIT_USERNAME")
 PASSWORD = os.getenv("REDDIT_PASSWORD")
 USER_AGENT = "RedditTracker/1.0"
 
-# Lista över subreddits att tracka
 SUBREDDITS = ["Normalnudes", "Gonewild", "RealGirls", "Tributeme"]
 
 # Funktion för att hämta OAuth-token
@@ -88,10 +87,6 @@ def index():
 def activity_chart():
     subreddit = request.args.get("subreddit", "Normalnudes")
     df = get_data(subreddit)
-    
-    if df.empty:
-        return jsonify({"error": "No data available"}), 404
-
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values(by='timestamp')
     
@@ -116,12 +111,12 @@ def activity_chart():
 def get_timestamps():
     subreddit = request.args.get("subreddit", "Normalnudes")
     df = get_data(subreddit)
-    
-    if df.empty:
-        return jsonify({"error": "No data available"}), 404
-    
     timestamps = df['timestamp'].tolist()
     return jsonify(timestamps)
+
+@app.route("/activity")
+def activity():
+    return render_template("activity.html", subreddits=SUBREDDITS)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
