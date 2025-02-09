@@ -75,9 +75,9 @@ thread = threading.Thread(target=scheduled_fetch, daemon=True)
 thread.start()
 
 # Hämta data från databasen
-def get_data(subreddit):
+def get_data():
     conn = sqlite3.connect("reddit_activity.db")
-    df = pd.read_sql_query("SELECT * FROM activity WHERE subreddit = ?", conn, params=(subreddit,))
+    df = pd.read_sql_query("SELECT * FROM activity ORDER BY timestamp DESC LIMIT 20", conn)
     conn.close()
     return df
 
@@ -85,36 +85,10 @@ def get_data(subreddit):
 def index():
     return render_template("index.html", subreddits=SUBREDDITS)
 
-@app.route("/api/activity_chart")
-def activity_chart():
-    subreddit = request.args.get("subreddit", "Normalnudes")
-    df = get_data(subreddit)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df = df.sort_values(by='timestamp')
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(df['timestamp'], df['active_users'], marker='o', linestyle='-', color='blue', label=subreddit)
-    ax.set_title(f"Utveckling av aktiva användare i {subreddit}")
-    ax.set_xlabel("Tid")
-    ax.set_ylabel("Antal Aktiva Användare")
-    ax.legend()
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-    plt.xticks(rotation=45, ha='right')
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
-    
-    img = io.BytesIO()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    
-    return send_file(img, mimetype='image/png')
-
-@app.route("/api/timestamps")
-def get_timestamps():
-    subreddit = request.args.get("subreddit", "Normalnudes")
-    df = get_data(subreddit)
-    timestamps = df['timestamp'].tolist()
-    return jsonify(timestamps)
+@app.route("/api/get_data")
+def api_get_data():
+    df = get_data()
+    return df.to_json(orient="records")
 
 @app.route("/api/fetch_data", methods=["POST"])
 def fetch_data():
