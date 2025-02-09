@@ -1,82 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reddit Activity</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
+    <title>Reddit Active Users Tracker</title>
+    <script>
+        function fetchData() {
+            fetch('/api/fetch_data', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Data hämtad:", data);
+                loadTableData();
+            });
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+
+        function loadTableData() {
+            fetch('/api/get_data')
+            .then(response => response.json())
+            .then(data => {
+                const table = document.getElementById("data-table");
+                table.innerHTML = "<tr><th>Tid</th><th>Normalnudes</th><th>Gonewild</th><th>RealGirls</th><th>Tributeme</th></tr>";
+                let groupedData = {};
+
+                data.forEach(row => {
+                    let time = new Date(row.timestamp).toLocaleTimeString();
+                    if (!groupedData[time]) {
+                        groupedData[time] = { time };
+                    }
+                    groupedData[time][row.subreddit] = row.active_users;
+                });
+
+                Object.values(groupedData).forEach(row => {
+                    let tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${row.time}</td>
+                        <td>${row.Normalnudes || 0}</td>
+                        <td>${row.Gonewild || 0}</td>
+                        <td>${row.RealGirls || 0}</td>
+                        <td>${row.Tributeme || 0}</td>
+                    `;
+                    table.appendChild(tr);
+                });
+            });
         }
-        th, td {
-            border: 1px solid black;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        button {
-            margin-top: 10px;
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+
+        window.onload = loadTableData;
+    </script>
 </head>
 <body>
-
     <h1>Reddit Active Users Tracker</h1>
     <button onclick="fetchData()">Hämta Data</button>
-
-    <table id="activityTable">
-        <thead>
-            <tr>
-                <th>Tid</th>
-                {% for subreddit in subreddits %}
-                    <th>{{ subreddit }}</th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
+    <table id="data-table" border="1">
+        <tr>
+            <th>Tid</th>
+            <th>Normalnudes</th>
+            <th>Gonewild</th>
+            <th>RealGirls</th>
+            <th>Tributeme</th>
+        </tr>
     </table>
-
-    <script>
-        async function fetchData() {
-            await fetch("/api/fetch_data", { method: "POST" });
-            loadActivityData();
-        }
-
-        async function loadActivityData() {
-            const response = await fetch("/api/timestamps?subreddit=Normalnudes");
-            const timestamps = await response.json();
-
-            let table = document.getElementById("activityTable").getElementsByTagName("tbody")[0];
-            table.innerHTML = "";
-
-            for (let timestamp of timestamps) {
-                let row = table.insertRow();
-                let cell = row.insertCell();
-                cell.textContent = new Date(timestamp).toLocaleString();
-
-                {% for subreddit in subreddits %}
-                    let subredditData = await fetch("/api/timestamps?subreddit={{ subreddit }}");
-                    let data = await subredditData.json();
-                    let cell = row.insertCell();
-                    cell.textContent = data.length ? data[data.length - 1] : "N/A";
-                {% endfor %}
-            }
-        }
-
-        window.onload = loadActivityData;
-    </script>
-
 </body>
 </html>
-
